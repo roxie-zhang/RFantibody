@@ -1,21 +1,21 @@
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
+FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y software-properties-common && \
-    DEBIAN_FRONTEND=noninteractive add-apt-repository -y ppa:deadsnakes/ppa && \
-    apt-get install --no-install-recommends -y python3.10 python3-pip pipx vim make wget
+# Base tools & Python 3.10 (22.04’s default), plus libcap2-bin for stripping caps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-venv python3-pip \
+      git wget curl ca-certificates vim make \
+      libcap2-bin \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN alias "python"="python3.10"
-
-# Make a virtual env that we can safely install into
-
+# Virtualenv + poetry
 RUN python3 -m venv /opt/venv
-# Enable venv
 ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --upgrade pip && pip install poetry
 
-RUN pip install poetry
-
-# Set the working directory to the user's home directory
 WORKDIR /home
 
-ENTRYPOINT /bin/bash
+# Strip Linux file capabilities so enroot can import cleanly
+RUN getcap -r / 2>/dev/null | awk '{print $1}' | xargs -r -n1 setcap -r || true
+
+ENTRYPOINT ["/bin/bash"]
